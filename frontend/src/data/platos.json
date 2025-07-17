@@ -1,0 +1,7 @@
+[
+  { "nombre": "Ceviche", "precio": 25.00 },
+  { "nombre": "Chicharrón", "precio": 22.00 },
+  { "nombre": "Arroz con mariscos", "precio": 28.00 },
+  { "nombre": "Tiradito", "precio": 24.00 },
+  { "nombre": "Pescado frito", "precio": 26.00 }
+]

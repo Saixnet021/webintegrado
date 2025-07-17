@@ -1,0 +1,18 @@
+@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+
+/* Tailwind directives */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Evitar scroll en toda la app */
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
