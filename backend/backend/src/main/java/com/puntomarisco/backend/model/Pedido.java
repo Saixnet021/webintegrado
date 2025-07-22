@@ -21,6 +21,13 @@ public class Pedido {
     private LocalDateTime hora;
     private Double total;
     private Boolean facturado = false;
+    
+    // Nuevo campo para método de pago
+    @Enumerated(EnumType.STRING)
+    private MetodoPago metodoPago;
+    
+    // Nuevo campo para URL del QR
+    private String qrUrl;
 
     @OneToMany(mappedBy = "pedido", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonManagedReference
@@ -33,5 +40,11 @@ public class Pedido {
         ENTREGADO,
         FACTURADO,
         CANCELADO
+    }
+    
+    public enum MetodoPago {
+        EFECTIVO,
+        YAPE,
+        VISA
     }
 }

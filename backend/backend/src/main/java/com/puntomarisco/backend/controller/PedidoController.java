@@ -1,6 +1,7 @@
 package com.puntomarisco.backend.controller;
 
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -70,6 +71,17 @@ public class PedidoController {
         return ResponseEntity.notFound().build();
     }
 
+    // Nuevo endpoint para facturar con método de pago
+    @PutMapping("/{id}/facturar-con-pago")
+    public ResponseEntity<Pedido> facturarPedidoConPago(@PathVariable Long id, @RequestBody Map<String, String> request) {
+        String metodoPago = request.get("metodoPago");
+        Pedido pedidoFacturado = pedidoService.facturarPedidoConPago(id, metodoPago);
+        if (pedidoFacturado != null) {
+            return ResponseEntity.ok(pedidoFacturado);
+        }
+        return ResponseEntity.notFound().build();
+    }
+
     @PutMapping("/{id}/estado")
     public ResponseEntity<Pedido> actualizarEstado(@PathVariable Long id, @RequestParam String estado) {
         Pedido pedidoActualizado = pedidoService.actualizarEstadoPedido(id, estado);
@@ -99,6 +111,16 @@ public class PedidoController {
     @GetMapping("/del-dia")
     public List<Pedido> obtenerPedidosDelDia() {
         return pedidoService.obtenerPedidosDelDia();
+    }
+
+    // Nuevo endpoint para generar QR de un pedido
+    @GetMapping("/{id}/qr")
+    public ResponseEntity<Map<String, String>> generarQRPedido(@PathVariable Long id) {
+        String qrUrl = pedidoService.generarQRPedido(id);
+        if (qrUrl != null) {
+            return ResponseEntity.ok(Map.of("qrUrl", qrUrl));
+        }
+        return ResponseEntity.notFound().build();
     }
 
     // WebSocket endpoint para recibir pedidos y enviarlos a todos los suscriptores

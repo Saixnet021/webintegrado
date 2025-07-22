@@ -51,6 +51,10 @@ public class PedidoService {
             }
             pedido.setTotal(total);
 
+            // Generar QR para el pedido
+            String qrUrl = generarQRPedido(pedido);
+            pedido.setQrUrl(qrUrl);
+
             Pedido pedidoGuardado = pedidoRepository.save(pedido);
             logger.info("Pedido guardado exitosamente con ID: {}", pedidoGuardado.getId());
 
@@ -163,6 +167,83 @@ public class PedidoService {
         } catch (Exception e) {
             logger.error("Error al facturar pedido {}: {}", id, e.getMessage(), e);
             throw new RuntimeException("Error al facturar el pedido", e);
+        }
+    }
+
+    // Nuevo método para facturar con método de pago
+    public Pedido facturarPedidoConPago(Long id, String metodoPago) {
+        try {
+            logger.info("Facturando pedido con ID: {} y método de pago: {}", id, metodoPago);
+            
+            Pedido pedido = pedidoRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Pedido no encontrado con ID: " + id));
+            
+            // Establecer método de pago
+            try {
+                Pedido.MetodoPago metodoEnum = Pedido.MetodoPago.valueOf(metodoPago.toUpperCase());
+                pedido.setMetodoPago(metodoEnum);
+            } catch (IllegalArgumentException e) {
+                logger.warn("Método de pago no válido: {}, usando EFECTIVO por defecto", metodoPago);
+                pedido.setMetodoPago(Pedido.MetodoPago.EFECTIVO);
+            }
+            
+            pedido.setEstado(Pedido.EstadoPedido.FACTURADO);
+            pedido.setFacturado(true);
+            
+            Pedido pedidoGuardado = pedidoRepository.save(pedido);
+            
+            // Verificar si hay más pedidos activos en la mesa
+            List<Pedido> pedidosActivosMesa = pedidoRepository.findByMesaAndFacturadoFalse(pedido.getMesa());
+            if (pedidosActivosMesa.isEmpty()) {
+                // Cambiar estado de mesa a LIBRE solo si no hay más pedidos activos
+                cambiarEstadoMesa(pedido.getMesa(), Mesa.EstadoMesa.LIBRE);
+            }
+            
+            logger.info("Pedido facturado exitosamente con método de pago: {}", metodoPago);
+            return pedidoGuardado;
+            
+        } catch (Exception e) {
+            logger.error("Error al facturar pedido {} con pago: {}", id, e.getMessage(), e);
+            throw new RuntimeException("Error al facturar el pedido", e);
+        }
+    }
+
+    // Nuevo método para generar QR
+    public String generarQRPedido(Long pedidoId) {
+        try {
+            Pedido pedido = pedidoRepository.findById(pedidoId).orElse(null);
+            if (pedido != null) {
+                return generarQRPedido(pedido);
+            }
+            return null;
+        } catch (Exception e) {
+            logger.error("Error al generar QR para pedido {}: {}", pedidoId, e.getMessage(), e);
+            return null;
+        }
+    }
+
+    // Método auxiliar para generar QR de un pedido
+    private String generarQRPedido(Pedido pedido) {
+        try {
+            // Crear datos del pedido para el QR
+            String datosQR = String.format(
+                "Pedido #%d\nMesa: %s\nTotal: S/%.2f\nFecha: %s\nRestaurante: Punto Marisco",
+                pedido.getId(),
+                pedido.getMesa(),
+                pedido.getTotal(),
+                pedido.getHora() != null ? pedido.getHora().toString() : "N/A"
+            );
+            
+            // URL del QR usando QR Server API
+            String qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=" + 
+                          java.net.URLEncoder.encode(datosQR, "UTF-8");
+            
+            logger.info("QR generado para pedido {}: {}", pedido.getId(), qrUrl);
+            return qrUrl;
+            
+        } catch (Exception e) {
+            logger.error("Error al generar QR: {}", e.getMessage(), e);
+            return null;
         }
     }
 
