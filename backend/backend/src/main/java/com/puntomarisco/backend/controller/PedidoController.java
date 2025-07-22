@@ -96,6 +96,11 @@ public class PedidoController {
                 .toList();
     }
 
+    @GetMapping("/del-dia")
+    public List<Pedido> obtenerPedidosDelDia() {
+        return pedidoService.obtenerPedidosDelDia();
+    }
+
     // WebSocket endpoint para recibir pedidos y enviarlos a todos los suscriptores
     @MessageMapping("/pedido")
     @SendTo("/topic/pedidos")

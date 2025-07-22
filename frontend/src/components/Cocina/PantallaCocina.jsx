@@ -1,28 +1,42 @@
 import React, { useState, useEffect, useCallback } from "react";
 import BackButton from "../UI/BackButton";
 import sseService from "../../api/sseService";
+import { pedidoAPI } from "../../api/pedidoAPI";
 
 export default function PantallaCocina() {
   const [pedidos, setPedidos] = useState([]);
   const [connectionStatus, setConnectionStatus] = useState("Desconectado");
   const [lastError, setLastError] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   // Función para manejar nuevos pedidos recibidos via SSE
   const handleNewPedido = useCallback((nuevoPedido) => {
-    console.log("Nuevo pedido recibido:", nuevoPedido);
+    console.log("Pedido recibido via SSE:", nuevoPedido);
     setPedidos((prev) => {
-      // Evitar duplicados basándose en el ID del pedido
-      const exists = prev.some(p => p.id === nuevoPedido.id);
-      if (exists) {
-        return prev;
+      // Buscar si el pedido ya existe
+      const existingIndex = prev.findIndex(p => p.id === nuevoPedido.id);
+      
+      if (existingIndex !== -1) {
+        // El pedido ya existe, actualizarlo manteniendo el estado de los checkboxes
+        const pedidosActualizados = [...prev];
+        pedidosActualizados[existingIndex] = {
+          ...nuevoPedido,
+          // Mantener el estado de los checkboxes del pedido existente
+          enProceso: prev[existingIndex].enProceso || false,
+          terminado: prev[existingIndex].terminado || false
+        };
+        console.log("Pedido actualizado en cocina:", nuevoPedido.id);
+        return pedidosActualizados;
+      } else {
+        // Es un pedido nuevo, agregarlo con estado inicial
+        const pedidoConEstado = {
+          ...nuevoPedido,
+          enProceso: false,
+          terminado: false
+        };
+        console.log("Nuevo pedido agregado a cocina:", nuevoPedido.id);
+        return [...prev, pedidoConEstado];
       }
-      // Agregar estado inicial para checkboxes
-      const pedidoConEstado = {
-        ...nuevoPedido,
-        enProceso: false,
-        terminado: false
-      };
-      return [...prev, pedidoConEstado];
     });
   }, []);
 
@@ -76,7 +90,34 @@ export default function PantallaCocina() {
     return `${minutos.toString().padStart(2, '0')}:${(diferencia * 60 % 60).toString().padStart(2, '0')}`;
   };
 
+  // Función para cargar pedidos del día al iniciar
+  const cargarPedidosDelDia = useCallback(async () => {
+    try {
+      setLoading(true);
+      console.log("Cargando pedidos del día...");
+      const pedidosDelDia = await pedidoAPI.obtenerPedidosDelDia();
+      
+      // Agregar estado inicial de checkboxes a cada pedido
+      const pedidosConEstado = pedidosDelDia.map(pedido => ({
+        ...pedido,
+        enProceso: false,
+        terminado: false
+      }));
+      
+      setPedidos(pedidosConEstado);
+      console.log(`Cargados ${pedidosConEstado.length} pedidos del día`);
+    } catch (error) {
+      console.error("Error al cargar pedidos del día:", error);
+      setLastError("Error al cargar pedidos del día");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
+    // Cargar pedidos del día al iniciar
+    cargarPedidosDelDia();
+
     // Registrar handlers
     sseService.addMessageHandler(handleNewPedido);
     sseService.addErrorHandler(handleError);
@@ -97,7 +138,7 @@ export default function PantallaCocina() {
       // NO desconectar el servicio aquí ya que es un singleton
       // y otros componentes podrían estar usándolo
     };
-  }, [handleNewPedido, handleError, handleConnectionStatus]);
+  }, [handleNewPedido, handleError, handleConnectionStatus, cargarPedidosDelDia]);
 
   // Función para obtener el color del indicador de estado
   const getStatusColor = () => {
@@ -111,8 +152,24 @@ export default function PantallaCocina() {
       <BackButton to="/" />
       <div className="p-6">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-3xl font-bold">Pedidos en Cocina</h2>
+          <div>
+            <h2 className="text-3xl font-bold">Pedidos en Cocina</h2>
+            <p className="text-sm text-gray-400 mt-1">
+              Mostrando todos los pedidos del día ({new Date().toLocaleDateString()})
+            </p>
+          </div>
           <div className="flex items-center space-x-4">
+            <button
+              onClick={cargarPedidosDelDia}
+              disabled={loading}
+              className={`px-3 py-1 text-white text-sm rounded transition-colors ${
+                loading 
+                  ? "bg-gray-500 cursor-not-allowed" 
+                  : "bg-blue-500 hover:bg-blue-600"
+              }`}
+            >
+              {loading ? "Cargando..." : "🔄 Actualizar"}
+            </button>
             <div className="flex items-center space-x-2">
               <div className={`w-3 h-3 rounded-full ${getStatusColor()}`}></div>
               <span className="text-sm">{connectionStatus}</span>
@@ -152,9 +209,13 @@ export default function PantallaCocina() {
           </div>
         )}
         
-        {pedidos.length === 0 ? (
+        {loading ? (
           <div className="text-center text-gray-400 mt-10">
-            <p>No hay pedidos pendientes</p>
+            <p>Cargando pedidos del día...</p>
+          </div>
+        ) : pedidos.length === 0 ? (
+          <div className="text-center text-gray-400 mt-10">
+            <p>No hay pedidos del día</p>
             <p className="text-sm mt-2">Los nuevos pedidos aparecerán aquí en tiempo real</p>
             {connectionStatus !== "Conectado" && (
               <p className="text-sm mt-2 text-yellow-400">
@@ -173,8 +234,14 @@ export default function PantallaCocina() {
               >
                 <div className="flex justify-between items-start mb-3">
                   <div>
-                    <h3 className="text-lg font-bold text-white">
+                    <h3 className="text-lg font-bold text-white flex items-center">
                       P0{index + 1}: Mesa {pedido.mesa} - {new Date(pedido.hora).toLocaleTimeString()}
+                      {/* Indicador de pedido editado */}
+                      {pedido.detalles && pedido.detalles.some(d => d.estado === 'EDITADO' || d.estado === 'AGREGADO') && (
+                        <span className="ml-2 px-2 py-1 bg-blue-600 text-white text-xs rounded-full">
+                          EDITADO
+                        </span>
+                      )}
                     </h3>
                     <p className="text-sm text-gray-300">
                       Tiempo transcurrido - {calcularTiempoTranscurrido(pedido.hora)}

@@ -1,5 +1,6 @@
 package com.puntomarisco.backend.repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -23,6 +24,9 @@ public interface PedidoRepository extends JpaRepository<Pedido, Long> {
     
     // Buscar pedidos no facturados
     List<Pedido> findByFacturadoFalse();
+    
+    // Buscar pedidos por rango de fechas
+    List<Pedido> findByHoraBetween(LocalDateTime inicio, LocalDateTime fin);
     
     // Buscar pedidos por estado ordenados por hora
     @Query("SELECT p FROM Pedido p WHERE p.estado = :estado ORDER BY p.hora DESC")

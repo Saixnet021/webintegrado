@@ -1,4 +1,3 @@
-// src/Components/Pedido/FormularioPedido.jsx
 import React, { useState, useEffect } from "react";
 import platosPredefinidos from "../../data/platos.json";
 import { crearPedido } from "../../api/pedidoAPI";
@@ -7,22 +6,24 @@ import BackButton from "../UI/BackButton";
 import { pedidoAPI } from "../../api/pedidoAPI";
 
 export default function FormularioPedido() {
-  const { id } = useParams(); 
+  const { id } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const editId = searchParams.get('edit');
-  
-  const [platos, setPlatos] = useState([{ plato: "", cantidad: 1, notas: "", precio: 0 }]);
+  const editId = searchParams.get("edit");
+
+  const [platos, setPlatos] = useState([
+    { id: null, plato: "", cantidad: 1, notas: "", precio: 0 },
+  ]);
   const [loading, setLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [pedidoOriginal, setPedidoOriginal] = useState(null);
 
   // Crear mapa de precios desde el JSON
   const preciosPlatos = {};
-  platosPredefinidos.forEach(plato => {
-    if (typeof plato === 'object' && plato.nombre && plato.precio) {
+  platosPredefinidos.forEach((plato) => {
+    if (typeof plato === "object" && plato.nombre && plato.precio) {
       preciosPlatos[plato.nombre] = plato.precio;
-    } else if (typeof plato === 'string') {
+    } else if (typeof plato === "string") {
       // Fallback para strings simples
       preciosPlatos[plato] = 0;
     }
@@ -40,26 +41,27 @@ export default function FormularioPedido() {
       const pedido = await pedidoAPI.obtenerPedidoPorId(editId);
       setPedidoOriginal(pedido);
       setIsEditing(true);
-      
-      // Cargar los detalles del pedido en el formulario
-      const platosConPrecio = pedido.detalles.map(detalle => ({
+
+      // Cargar los detalles del pedido en el formulario, incluyendo id
+      const platosConPrecio = pedido.detalles.map((detalle) => ({
+        id: detalle.id || null,
         plato: detalle.plato,
         cantidad: detalle.cantidad || 1,
         notas: detalle.notas || "",
-        precio: detalle.precio || preciosPlatos[detalle.plato] || 0
+        precio: detalle.precio || preciosPlatos[detalle.plato] || 0,
       }));
-      
+
       setPlatos(platosConPrecio);
     } catch (error) {
-      console.error('Error al cargar pedido:', error);
-      alert('Error al cargar el pedido para editar');
+      console.error("Error al cargar pedido:", error);
+      alert("Error al cargar el pedido para editar");
     } finally {
       setLoading(false);
     }
   };
 
   const handleAgregarPlato = () => {
-    setPlatos([...platos, { plato: "", cantidad: 1, notas: "", precio: 0 }]);
+    setPlatos([...platos, { id: null, plato: "", cantidad: 1, notas: "", precio: 0 }]);
   };
 
   const handleEliminarPlato = (index) => {
@@ -72,12 +74,12 @@ export default function FormularioPedido() {
   const handleCambioPlato = (index, campo, valor) => {
     const nuevosPlatos = [...platos];
     nuevosPlatos[index][campo] = valor;
-    
+
     // Si cambió el plato, actualizar el precio
-    if (campo === 'plato') {
+    if (campo === "plato") {
       nuevosPlatos[index].precio = preciosPlatos[valor] || 0;
     }
-    
+
     setPlatos(nuevosPlatos);
   };
 
@@ -90,14 +92,14 @@ export default function FormularioPedido() {
 
   const calcularTotal = () => {
     return platos.reduce((total, plato) => {
-      return total + (plato.precio * plato.cantidad);
+      return total + plato.precio * plato.cantidad;
     }, 0);
   };
 
   const validarPedido = () => {
-    const platosValidos = platos.filter(p => p.plato.trim() !== '');
+    const platosValidos = platos.filter((p) => p.plato.trim() !== "");
     if (platosValidos.length === 0) {
-      alert('Debe agregar al menos un plato');
+      alert("Debe agregar al menos un plato");
       return false;
     }
     return true;
@@ -105,48 +107,88 @@ export default function FormularioPedido() {
 
   const handleEnviar = async () => {
     if (!validarPedido()) return;
-    
+
     setLoading(true);
     try {
-      const platosValidos = platos.filter(p => p.plato.trim() !== '');
-      
+      const platosValidos = platos.filter((p) => p.plato.trim() !== "");
+
       if (isEditing) {
         // Actualizar pedido existente
+        const detallesConEstado = platosValidos.map((detalle) => {
+          // Buscar detalle original por id para mantener estado correcto
+          const detalleOriginal = pedidoOriginal.detalles.find((d) => d.id === detalle.id);
+
+          return {
+            ...detalle,
+            id: detalle.id || null,
+            estado: detalleOriginal ? "EDITADO" : "AGREGADO",
+          };
+        });
+
         const pedidoActualizado = {
           ...pedidoOriginal,
-          detalles: platosValidos
+          detalles: detallesConEstado,
         };
-        
+
+        console.log("Enviando pedido actualizado:", pedidoActualizado);
         const resultado = await pedidoAPI.actualizarPedido(editId, pedidoActualizado);
-        navigate(`/resumen/${resultado.id}`);
+        console.log("Pedido actualizado exitosamente:", resultado);
+        
+        // Verificar que el resultado tenga ID antes de navegar
+        if (resultado && resultado.id) {
+          navigate(`/resumen/${resultado.id}`);
+        } else {
+          console.error("Error: No se recibió ID del pedido actualizado", resultado);
+          alert("Pedido actualizado pero hubo un problema al cargar el resumen. Regresando a mesas.");
+          navigate('/mesas');
+        }
       } else {
         // Crear nuevo pedido
         const pedido = {
           mesa: id,
           detalles: platosValidos,
         };
+
+        console.log("Enviando nuevo pedido:", pedido);
+        const response = await crearPedido(pedido);
+        const resultado = response.data; // Extraer data de la respuesta de axios
+        console.log("Pedido creado exitosamente:", resultado);
         
-        const resultado = await crearPedido(pedido);
-        navigate(`/resumen/${resultado.id}`);
+        // Verificar que el resultado tenga ID antes de navegar
+        if (resultado && resultado.id) {
+          navigate(`/resumen/${resultado.id}`);
+        } else {
+          console.error("Error: No se recibió ID del pedido creado", resultado);
+          alert("Pedido creado pero hubo un problema al cargar el resumen. Regresando a mesas.");
+          navigate('/mesas');
+        }
       }
     } catch (error) {
-      console.error('Error al procesar pedido:', error);
-      alert('Error al procesar el pedido. Intente nuevamente.');
+      console.error("Error al procesar pedido:", error);
+      
+      // Mostrar mensaje de error más específico
+      let mensajeError = "Error al procesar el pedido. ";
+      if (error.response) {
+        // Error del servidor
+        mensajeError += `Código: ${error.response.status}. `;
+        if (error.response.data && error.response.data.message) {
+          mensajeError += error.response.data.message;
+        } else {
+          mensajeError += "Error en el servidor.";
+        }
+      } else if (error.request) {
+        // Error de conexión
+        mensajeError += "No se pudo conectar con el servidor. Verifique su conexión.";
+      } else {
+        // Otro tipo de error
+        mensajeError += error.message || "Error desconocido.";
+      }
+      
+      alert(mensajeError + " Intente nuevamente.");
     } finally {
       setLoading(false);
     }
   };
-
-  if (loading && isEditing && !pedidoOriginal) {
-    return (
-      <div className="bg-[#1B1B1B] min-h-screen text-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
-          <p>Cargando pedido...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="bg-[#1B1B1B] min-h-screen text-white w-full">
@@ -166,7 +208,10 @@ export default function FormularioPedido() {
 
         <div className="space-y-4">
           {platos.map((item, index) => (
-            <div key={index} className="bg-gray-800 p-4 rounded-2xl border border-orange-500 relative">
+            <div
+              key={index}
+              className="bg-gray-800 p-4 rounded-2xl border border-orange-500 relative"
+            >
               {/* Botón eliminar plato */}
               {platos.length > 1 && (
                 <button
@@ -176,7 +221,7 @@ export default function FormularioPedido() {
                   ✕
                 </button>
               )}
-              
+
               <select
                 value={item.plato}
                 onChange={(e) => handleCambioPlato(index, "plato", e.target.value)}
@@ -184,8 +229,8 @@ export default function FormularioPedido() {
               >
                 <option value="">-- Selecciona un plato --</option>
                 {platosPredefinidos.map((plato, i) => {
-                  const nombre = typeof plato === 'object' ? plato.nombre : plato;
-                  const precio = typeof plato === 'object' ? plato.precio : 0;
+                  const nombre = typeof plato === "object" ? plato.nombre : plato;
+                  const precio = typeof plato === "object" ? plato.precio : 0;
                   return (
                     <option key={i} value={nombre}>
                       {nombre} - S/ {precio.toFixed(2)}
@@ -193,17 +238,17 @@ export default function FormularioPedido() {
                   );
                 })}
               </select>
-              
+
               {/* Mostrar precio si hay plato seleccionado */}
               {item.plato && (
                 <div className="text-orange-400 text-sm mb-2">
                   Precio: S/ {item.precio.toFixed(2)} c/u
                 </div>
               )}
-              
+
               <div className="flex gap-2 mb-3 items-center">
                 <span className="text-white text-sm w-16">Cantidad:</span>
-                <button 
+                <button
                   onClick={() => handleCambioCantidad(index, -1)}
                   className="bg-orange-500 hover:bg-orange-600 text-white w-10 h-10 rounded-lg text-xl font-bold"
                 >
@@ -218,7 +263,7 @@ export default function FormularioPedido() {
                   }
                   className="border-2 border-orange-500 p-2 w-16 text-black rounded-lg text-base bg-white text-center"
                 />
-                <button 
+                <button
                   onClick={() => handleCambioCantidad(index, 1)}
                   className="bg-orange-500 hover:bg-orange-600 text-white w-10 h-10 rounded-lg text-xl font-bold"
                 >
@@ -230,7 +275,7 @@ export default function FormularioPedido() {
                   </div>
                 )}
               </div>
-              
+
               <textarea
                 placeholder="Notas (opcional)"
                 value={item.notas}
@@ -240,7 +285,7 @@ export default function FormularioPedido() {
             </div>
           ))}
         </div>
-        
+
         {/* Total */}
         {calcularTotal() > 0 && (
           <div className="bg-gray-800 p-4 rounded-2xl border-2 border-orange-500 mt-4">
@@ -252,7 +297,7 @@ export default function FormularioPedido() {
             </div>
           </div>
         )}
-        
+
         <div className="flex gap-3 mt-6">
           <button
             onClick={handleAgregarPlato}
@@ -265,12 +310,12 @@ export default function FormularioPedido() {
             onClick={handleEnviar}
             disabled={loading}
             className={`px-6 py-4 rounded-2xl font-semibold text-lg touch-manipulation flex-1 ${
-              loading 
-                ? 'bg-gray-600 text-gray-300 cursor-not-allowed' 
-                : 'bg-orange-500 hover:bg-orange-600 text-white'
+              loading
+                ? "bg-gray-600 text-gray-300 cursor-not-allowed"
+                : "bg-orange-500 hover:bg-orange-600 text-white"
             }`}
           >
-            {loading ? 'Procesando...' : isEditing ? '💾 Guardar Cambios' : '🚀 Enviar Pedido'}
+            {loading ? (isEditing ? "💾 Guardar Cambios" : "Procesando...") : isEditing ? "💾 Guardar Cambios" : "🚀 Enviar Pedido"}
           </button>
         </div>
       </div>

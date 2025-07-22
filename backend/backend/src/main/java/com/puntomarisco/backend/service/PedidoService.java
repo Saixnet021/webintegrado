@@ -80,9 +80,15 @@ public class PedidoService {
             Pedido pedidoExistente = pedidoRepository.findById(id)
                     .orElseThrow(() -> new RuntimeException("Pedido no encontrado con ID: " + id));
             
-            // Marcar detalles editados/agregados
+            // Limpiar detalles existentes para evitar problemas de cascada
+            if (pedidoExistente.getDetalles() != null) {
+                pedidoExistente.getDetalles().clear();
+            }
+            
+            // Preparar nuevos detalles
             if (pedidoActualizado.getDetalles() != null) {
                 for (DetallePedido detalle : pedidoActualizado.getDetalles()) {
+                    // Establecer el estado apropiado
                     if (detalle.getId() == null) {
                         // Nuevo detalle
                         detalle.setEstado(DetallePedido.EstadoDetalle.AGREGADO);
@@ -90,12 +96,15 @@ public class PedidoService {
                         // Detalle existente modificado
                         detalle.setEstado(DetallePedido.EstadoDetalle.EDITADO);
                     }
+                    
+                    // Limpiar el ID para forzar la creación de nuevos registros
+                    detalle.setId(null);
                     detalle.setPedido(pedidoExistente);
                 }
+                
+                // Agregar los nuevos detalles
+                pedidoExistente.getDetalles().addAll(pedidoActualizado.getDetalles());
             }
-            
-            // Actualizar campos
-            pedidoExistente.setDetalles(pedidoActualizado.getDetalles());
             
             // Recalcular total
             double total = 0.0;
@@ -109,7 +118,9 @@ public class PedidoService {
             }
             pedidoExistente.setTotal(total);
             
+            // Guardar el pedido actualizado
             Pedido pedidoGuardado = pedidoRepository.save(pedidoExistente);
+            logger.info("Pedido actualizado exitosamente con ID: {}", pedidoGuardado.getId());
             
             // Enviar notificación de actualización via SSE
             try {
@@ -164,6 +175,21 @@ public class PedidoService {
         } catch (Exception e) {
             logger.error("Error al obtener pedidos: {}", e.getMessage(), e);
             throw new RuntimeException("Error al obtener la lista de pedidos", e);
+        }
+    }
+
+    public List<Pedido> obtenerPedidosDelDia() {
+        try {
+            logger.debug("Obteniendo pedidos del día actual");
+            LocalDateTime inicioDelDia = LocalDateTime.now().withHour(0).withMinute(0).withSecond(0).withNano(0);
+            LocalDateTime finDelDia = LocalDateTime.now().withHour(23).withMinute(59).withSecond(59).withNano(999999999);
+            
+            List<Pedido> pedidos = pedidoRepository.findByHoraBetween(inicioDelDia, finDelDia);
+            logger.debug("Se encontraron {} pedidos del día", pedidos.size());
+            return pedidos;
+        } catch (Exception e) {
+            logger.error("Error al obtener pedidos del día: {}", e.getMessage(), e);
+            throw new RuntimeException("Error al obtener pedidos del día", e);
         }
     }
 

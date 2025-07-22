@@ -105,9 +105,9 @@ export default function DashboardMesas() {
   }
 
   return (
-    <div className="bg-[#1B1B1B] min-h-screen text-white w-full">
+    <div className="bg-[#1B1B1B] min-h-screen text-white w-full overflow-hidden flex flex-col">
       <BackButton to="/" />
-      <div className="px-4 py-6 w-full">
+      <div className="px-4 py-6 w-full flex-1 overflow-y-auto">
         {/* Título con indicadores */}
         <div className="text-center mb-6">
           <h1 className="text-2xl font-bold text-orange-500 mb-4">Gestión de Mesas</h1>
@@ -123,7 +123,7 @@ export default function DashboardMesas() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 mb-6">
+        <div className="grid grid-cols-2 gap-3 mb-6 max-h-[calc(100vh-280px)] overflow-y-auto pb-4">
           {mesas.map((mesa) => {
             const estadoInfo = getEstadoMesa(mesa);
             const pedidosActivos = pedidosPorMesa[mesa.nombre] || [];
@@ -145,58 +145,60 @@ export default function DashboardMesas() {
                     </button>
                   </div>
                 ) : (
-                  <button
-                    onClick={() => handleClickMesa(mesa)}
-                    className={`w-full h-28 bg-black text-white border-2 border-orange-500 rounded-2xl font-semibold hover:bg-orange-600 hover:text-black transition relative flex flex-col justify-center items-center touch-manipulation ${
-                      estadoInfo.estado === 'OCUPADA' ? 'ring-2 ring-red-400' : ''
-                    }`}
-                  >
-                    <div className="text-lg font-bold">{mesa.nombre}</div>
-                    
-                    {/* Indicador de estado */}
-                    <div className={`absolute top-2 right-2 w-4 h-4 rounded-full ${
-                      estadoInfo.estado === 'OCUPADA' ? 'bg-red-500' : 'bg-green-500'
-                    }`}></div>
-                    
-                    {/* Información de estado */}
-                    <div className="absolute bottom-2 left-3 text-xs">
-                      <span className="text-white">Estado: </span>
-                      <span className={estadoInfo.color}>
-                        {estadoInfo.estado}
-                      </span>
-                    </div>
-                    
-                    {/* Información de pedidos activos */}
-                    {pedidosActivos.length > 0 && (
-                      <div className="absolute bottom-2 right-3 text-xs">
-                        <span className="text-orange-400">
-                          {pedidosActivos.length} pedido{pedidosActivos.length > 1 ? 's' : ''}
+                  <div className="relative">
+                    <button
+                      onClick={() => handleClickMesa(mesa)}
+                      className={`w-full h-28 bg-black text-white border-2 border-orange-500 rounded-2xl font-semibold hover:bg-orange-600 hover:text-black transition relative flex flex-col justify-center items-center touch-manipulation ${
+                        estadoInfo.estado === 'OCUPADA' ? 'ring-2 ring-red-400' : ''
+                      }`}
+                    >
+                      <div className="text-lg font-bold">{mesa.nombre}</div>
+                      
+                      {/* Indicador de estado */}
+                      <div className={`absolute top-2 right-2 w-4 h-4 rounded-full ${
+                        estadoInfo.estado === 'OCUPADA' ? 'bg-red-500' : 'bg-green-500'
+                      }`}></div>
+                      
+                      {/* Información de estado */}
+                      <div className="absolute bottom-2 left-3 text-xs">
+                        <span className="text-white">Estado: </span>
+                        <span className={estadoInfo.color}>
+                          {estadoInfo.estado}
                         </span>
                       </div>
-                    )}
+                      
+                      {/* Información de pedidos activos */}
+                      {pedidosActivos.length > 0 && (
+                        <div className="absolute bottom-2 right-3 text-xs">
+                          <span className="text-orange-400">
+                            {pedidosActivos.length} pedido{pedidosActivos.length > 1 ? 's' : ''}
+                          </span>
+                        </div>
+                      )}
+                    </button>
                     
-                    {/* Botón de edición */}
+                    {/* Botón de edición - Fuera del botón principal */}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         iniciarEdicion(mesa);
                       }}
-                      className="absolute top-2 left-2 bg-gray-700 hover:bg-gray-600 text-white w-6 h-6 rounded-full text-xs"
+                      className="absolute top-2 left-2 bg-gray-700 hover:bg-gray-600 text-white w-6 h-6 rounded-full text-xs z-10"
                     >
                       ✏️
                     </button>
                     
-                    {/* Botón de eliminar */}
+                    {/* Botón de eliminar - Fuera del botón principal */}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         eliminarMesa(mesa.id);
                       }}
-                      className="absolute top-10 left-2 bg-red-700 hover:bg-red-600 text-white w-6 h-6 rounded-full text-xs"
+                      className="absolute top-10 left-2 bg-red-700 hover:bg-red-600 text-white w-6 h-6 rounded-full text-xs z-10"
                     >
                       🗑️
                     </button>
-                  </button>
+                  </div>
                 )}
               </div>
             );

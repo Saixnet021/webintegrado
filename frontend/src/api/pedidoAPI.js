@@ -30,6 +30,9 @@ export const eliminarPedido = (id) => axios.delete(`${API_URL}/${id}`);
 // Obtener pedidos activos
 export const obtenerPedidosActivos = () => axios.get(`${API_URL}/activos`);
 
+// Obtener pedidos del día
+export const obtenerPedidosDelDia = () => axios.get(`${API_URL}/del-dia`);
+
 // API object para compatibilidad
 export const pedidoAPI = {
   crearPedido: async (pedido) => {
@@ -118,6 +121,16 @@ export const pedidoAPI = {
       return response.data;
     } catch (error) {
       console.error('Error al obtener pedidos activos:', error);
+      throw error;
+    }
+  },
+
+  obtenerPedidosDelDia: async () => {
+    try {
+      const response = await obtenerPedidosDelDia();
+      return response.data;
+    } catch (error) {
+      console.error('Error al obtener pedidos del día:', error);
       throw error;
     }
   }
